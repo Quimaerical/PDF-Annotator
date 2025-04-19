@@ -94,45 +94,40 @@
         // ==============================================================
         // IMPORTACIONES DE MÓDULOS
         // ==============================================================
-        // Importamos directamente las funciones y objetos necesarios
-        // de las versiones .mjs de PDF.js
+        
         import { getDocument, GlobalWorkerOptions } from 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.min.mjs';
-        // Konva ya expone Konva globalmente, así que no necesita importación especial aquí
+        
 
         // ==============================================================
         // VARIABLES DE ESTADO - Ahora definidas en el ámbito del módulo
         // ==============================================================
 
-        // CORRECCIÓN: Usar GlobalWorkerOptions importado, no pdfjsLib.GlobalWorkerOptions
         GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.worker.min.mjs';
 
-        var pdfUrl = null; // URL del PDF cargado
-        var pdfDoc = null; // Objeto PDFDocumentProxy de PDF.js
-        var pageNum = 1;   // Página actual mostrada
-        var pageRendering = false; // Indica si una página se está renderizando
-        var pageNumPending = null; // Número de página pendiente si se solicita otra durante el renderizado
+        var pdfUrl = null; // URL from loaded pdf
+        var pdfDoc = null; // Object PDFDocumentProxy de PDF.js
+        var pageNum = 1;   // actual page (to change page to Annotate change this var
+        var pageRendering = false; // a rendering page
+        var pageNumPending = null; // number of pending page if another is requested during render
         var pdfCanvas = document.getElementById('pdf-canvas'); // Elemento canvas del PDF
         var pdfCtx = pdfCanvas.getContext('2d'); // Contexto 2D del canvas del PDF
-        var filename = null; // Nombre del archivo PDF (sin extensión)
+        var filename = null; // Name of PDF file 
 
-        var width, height; // Dimensiones del canvas y el escenario Konva
-        var stage = null; // Escenario Konva
-        var layer = null; // Capa Konva
+        var width, height; // size of Konva canvas 
+        var stage = null; //  Konva stage
+        var layer = null; // Konva layer
 
 
         // ==============================================================
         // FUNCIONES PRINCIPALES - Definidas en el ámbito del módulo
         // ==============================================================
 
-        /**
-         * Renderiza una página específica del PDF en el canvas.
-         * @param {number} num El número de página a renderizar (base 1).
-         */
+        
         function renderPage(num) {
             pageRendering = true;
             if (layer) {
                 layer.destroyChildren();
-                layer.draw(); // Limpiar capa Konva antes de dibujar la nueva página (si existe)
+                layer.draw(); // upload konva layer if exists
             }
 
 
@@ -176,17 +171,13 @@
                         renderPage(pageNumPending);
                         pageNumPending = null;
                     }
-                    layer.draw(); // Dibujar la capa de Konva después de que el PDF se haya renderizado
+                    layer.draw(); 
                 });
             });
         }
 
-        /**
-         * Carga un documento PDF desde una URL.
-         * @param {string} url La URL del archivo PDF.
-         */
         function loadPdf(url) {
-            // CORRECCIÓN: Usar getDocument importado, no pdfjsLib.getDocument
+            
             getDocument(url).promise.then(function(pdf) {
                 pdfDoc = pdf;
                 document.getElementById('pdf-canvas').style.display = 'block';
@@ -199,11 +190,8 @@
             });
         }
 
-        /**
-         * Añade un objeto de texto a la capa Konva.
-         */
+        
         function addText() {
-             // CORRECCIÓN: Usar el ID correcto 'add-text-input' del input si lo cambiaste
             var textInput = document.getElementById('add-text-input');
             var textValue = textInput.value;
             if (textValue && stage && layer) {
@@ -212,36 +200,69 @@
                     y: 50,
                     text: textValue,
                     fontSize: 20,
-                    // CORRECCIÓN: Cambiar color del texto a algo visible
                     fill: '#000000', 
                     draggable: true,
                 });
                 layer.add(textNode);
                 layer.draw();
-                textInput.value = ''; // Limpiar el input después de añadir
+                textInput.value = ''; // clean the input after adding
             }
         }
 
-         /**
-         * Añade una imagen a la capa Konva desde un objeto File.
-         * @param {File} file El archivo de imagen seleccionado.
-         */
+        /**
+        * Adds an Image to Konva from a file
+        * @param {File} file El archivo de imagen seleccionado.
+        */
         function addImageFromFile(file) {
             if (file && stage && layer) {
                 var reader = new FileReader();
                 reader.onload = function(e) {
                     var imageObj = new Image();
                     imageObj.onload = function() {
+                        var originalWidth = imageObj.width;
+                        var originalHeight = imageObj.height;
+                        var maxInitialSize = 150;
+                        var newWidth = originalWidth;
+                        var newHeight = originalHeight;
+                        if (originalWidth > maxInitialSize || originalHeight > maxInitialSize){
+                            var aspectRatio = originalWidth / originalHeight;
+
+                            if (originalWidth > originalHeight){
+                                newWidth = maxInitialSize;
+                                newHeight = maxInitialSize / aspectRatio;
+                            }else{
+                                newHeight = maxInitialSize;
+                                newWidth = maxInitialSize * aspectRatio;
+                            }
+                        }
                         var imageNode = new Konva.Image({
                             x: 50,
                             y: 50,
                             image: imageObj,
-                            width: 100, // Tamaño inicial
-                            height: 100, // Tamaño inicial
+                            width: newWidth,
+                            height: newHeight,
                             draggable: true,
+                            
                         });
                         layer.add(imageNode);
                         layer.draw();
+
+                        imageNode.on('click tap', function () {
+                            layer.find('Transformer').destroy(); // destroy actual transformers
+                            var transformer = new Konva.Transformer({
+                                nodes: [imageNode],
+                            });
+                            layer.add(transformer);
+                            layer.draw();
+                        });
+                         
+                        stage.on('click tap', function (e) {
+                            // if click/tap wasnt in a konva shape remove transformers
+                            if (e.target === stage) {
+                                layer.find('Transformer').destroy();
+                                layer.draw();
+                            }
+                        });
                     };
                     imageObj.onerror = function() {
                         console.error("Error loading image for Konva", file.name);
@@ -249,29 +270,29 @@
                     };
                     imageObj.src = e.target.result;
                 };
-                reader.readAsDataURL(file); // Leer el archivo como URL de datos
+                reader.readAsDataURL(file); 
             }
         }
 
-        /**
-         * Combina el canvas del PDF y el escenario Konva, y exporta como imagen.
-         * Luego envía la imagen al servidor para guardarla.
-         */
+        /*
+        Combine the PDF canvas and Konva workflow and export as an image.
+        Then send the image to the server for saving.
+        */
         async function exportCanvas() {
             if (!pdfDoc || !stage || !layer || !filename) {
                 alert('PDF not loaded or something went wrong.');
                 return;
             }
 
-            layer.draw(); // Asegurarse de que Konva esté actualizado
+            layer.draw(); // Update konva
 
-            // 1. Obtener la Data URL de la capa Konva
+            // 1. Obtain Data URL from konva layer
             var konvaDataURL = layer.toDataURL();
 
-            // 2. Obtener la Data URL del canvas del PDF
+            // 2. obtain Data URL from PDF canvas
             var pdfDataURL = pdfCanvas.toDataURL('image/png');
 
-            // 3. Crear promesas para cargar ambas imágenes
+            // 3. new Promises for both images
             const loadImage = (url) => {
                 return new Promise((resolve, reject) => {
                     const img = new Image();
@@ -283,7 +304,7 @@
 
             let pdfImage, konvaImage;
             try {
-                 // Esperar a que ambas imágenes carguen
+                 // wait for both images to load 
                  [pdfImage, konvaImage] = await Promise.all([
                      loadImage(pdfDataURL),
                      loadImage(konvaDataURL)
@@ -295,21 +316,21 @@
             }
 
 
-            // 4. Crear un canvas temporal para combinar
+            // 4. create a temp canvas to combine
             var tempCanvas = document.createElement('canvas');
-            tempCanvas.width = stage.width(); // Usar las dimensiones de la etapa Konva/canvas PDF
+            tempCanvas.width = stage.width(); 
             tempCanvas.height = stage.height();
             var tempCtx = tempCanvas.getContext('2d');
 
-            // 5. Dibujar la imagen del PDF y la imagen de Konva en el canvas temporal
+            // 5. draw PDF image and konva image in the temporary canvas
             tempCtx.drawImage(pdfImage, 0, 0, tempCanvas.width, tempCanvas.height);
             tempCtx.drawImage(konvaImage, 0, 0, tempCanvas.width, tempCanvas.height);
 
 
-            // 6. Obtener la imagen combinada como Data URL
+            // 6. find combine image as data URL
             var combinedDataURL = tempCanvas.toDataURL('image/png');
 
-            // 7. Enviar la imagen combinada al servidor usando fetch
+            // 7. send combined image to server using fetch
             fetch('{{ route('export.image') }}', {
                 method: 'POST',
                 headers: {
@@ -318,7 +339,7 @@
                 },
                 body: JSON.stringify({
                     image_data: combinedDataURL,
-                    filename: filename // Usamos el nombre del archivo PDF original
+                    filename: filename // original pdf name
                 }),
             })
             .then(response => {
@@ -329,11 +350,11 @@
                          throw new Error(`HTTP error! status: ${response.status}`);
                      });
                 }
-                return response.json(); // Procesar si es OK
+                return response.json(); // Process if ok
             })
             .then(data => {
                 if (data.url) {
-                    // Abrir la URL de la imagen guardada en una nueva pestaña
+                    // open saved image in a new tab to allow user saving as image or pdf
                     window.open(data.url, '_blank');
                 } else {
                     alert('Error exporting image: No URL received from server.');
@@ -349,17 +370,17 @@
         // MANEJADORES DE EVENTOS - Adjuntados via JavaScript (dentro del módulo)
         // ==============================================================
 
-        // Manejar la subida del formulario
+        // Handle form
         document.getElementById('upload-form').addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevenir la subida estándar del formulario
-            var formData = new FormData(this); // Obtener los datos del formulario
+            event.preventDefault(); // prevent default form upload
+            var formData = new FormData(this); // Obtain form data
 
-            // Usar fetch para enviar los datos al servidor (solicitud AJAX)
+            // Use fetch to send data to server (AJAX)
             fetch(this.action, {
                 method: this.method,
                 body: formData,
                 headers: {
-                    // Incluir el token CSRF para Laravel
+                    // inlcude CSRF token for Laravel
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 }
             })
@@ -371,30 +392,28 @@
                          throw new Error(`HTTP error! status: ${response.status}`);
                      });
                 }
-                return response.json(); // Parsear la respuesta como JSON
+                return response.json(); // Parse JSON response
             })
             .then(data => {
-                // Si la respuesta JSON contiene pdfUrl y filename
+                // fi JSON response contains pdfUrl and filename
                 if (data.pdfUrl && data.filename) {
-                    pdfUrl = data.pdfUrl; // Guardar la URL del PDF
-                    filename = data.filename; // Guardar el nombre del archivo
-                    loadPdf(pdfUrl); // Cargar el PDF
-                     // Opcional: Ocultar la sección de carga después de subir
-                     // document.getElementById('upload-section').style.display = 'none';
+                    pdfUrl = data.pdfUrl; // save pdf url
+                    filename = data.filename; // save filename
+                    loadPdf(pdfUrl); 
+                    
                 } else {
-                     // Esto se ejecuta si la respuesta es 200 OK pero no tiene las propiedades esperadas
+                    // Alert if response is 200 OK but wrong properties
                     alert('Upload successful but server response is invalid.');
                 }
             })
             .catch(error => {
-                // Este bloque se ejecuta si fetch falla por red o si los .then lanzan un error
+                // if fetch fails bcs network or .then throw error
                 console.error('Upload Fetch Error:', error);
                 alert('Upload failed: ' + error.message);
             });
         });
 
-        // CORRECCIÓN: Adjuntar event listener al botón "Add Text"
-        // Asegúrate de que el ID 'add-text-button' exista en tu HTML
+        // add listener to add-text-button
         var addTextButton = document.getElementById('add-text-button');
         if (addTextButton) {
             addTextButton.addEventListener('click', addText);
@@ -403,8 +422,7 @@
         }
 
 
-        // CORRECCIÓN: Adjuntar event listener al input file para la imagen
-        // Asegúrate de que el ID 'add-image-input' exista en tu HTML
+        // add listener to add-image-input
         var addImageInput = document.getElementById('add-image-input');
         if (addImageInput) {
             addImageInput.addEventListener('change', function(event) {
@@ -419,8 +437,7 @@
         }
 
 
-        // CORRECCIÓN: Adjuntar event listener al botón "Export Image"
-        // Asegúrate de que el ID 'export-button' exista en tu HTML
+        // add listener to export-button
         var exportButton = document.getElementById('export-button');
         if (exportButton) {
             exportButton.addEventListener('click', exportCanvas);
@@ -432,8 +449,8 @@
         // ==============================================================
         // Lógica inicial al cargar la página (Opcional)
         // ==============================================================
-         // Esta parte solo se ejecuta si el controlador carga la vista pasando $pdfUrl y $filename
-         // Si solo usas la subida AJAX, esta parte no hará nada hasta que la subida ocurra.
+        // Esta parte solo se ejecuta si el controlador carga la vista pasando $pdfUrl y $filename
+        // Si solo usas la subida AJAX, esta parte no hará nada hasta que la subida ocurra.
         @if(isset($pdfUrl) && isset($filename))
             pdfUrl = "{{ $pdfUrl }}";
             filename = "{{ $filename }}";
