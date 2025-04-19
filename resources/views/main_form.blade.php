@@ -92,54 +92,62 @@
 
     <script type="module">
         // ==============================================================
-        // IMPORTACIONES DE MÓDULOS
+        // MODULE IMPORTS
         // ==============================================================
-        
+
         import { getDocument, GlobalWorkerOptions } from 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.min.mjs';
-        
 
         // ==============================================================
-        // VARIABLES DE ESTADO - Ahora definidas en el ámbito del módulo
+        // STATE VARIABLES - Now defined within the module scope
         // ==============================================================
 
         GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.worker.min.mjs';
 
-        var pdfUrl = null; // URL from loaded pdf
-        var pdfDoc = null; // Object PDFDocumentProxy de PDF.js
-        var pageNum = 1;   // actual page (to change page to Annotate change this var
-        var pageRendering = false; // a rendering page
-        var pageNumPending = null; // number of pending page if another is requested during render
-        var pdfCanvas = document.getElementById('pdf-canvas'); // Elemento canvas del PDF
-        var pdfCtx = pdfCanvas.getContext('2d'); // Contexto 2D del canvas del PDF
-        var filename = null; // Name of PDF file 
+        let pdfUrl = null; // URL from loaded pdf
+        let pdfDoc = null; // PDFDocumentProxy object from PDF.js
+        let pageNum = 1;     // current page (to change page to Annotate, change this var)
+        let pageRendering = false; // a rendering page
+        let pageNumPending = null; // number of pending page if another is requested during render
+        let pdfCanvas = document.getElementById('pdf-canvas'); // PDF canvas element
+        let pdfCtx = pdfCanvas.getContext('2d'); // 2D context of the PDF canvas
+        let filename = null; // Name of PDF file
 
-        var width, height; // size of Konva canvas 
-        var stage = null; //  Konva stage
-        var layer = null; // Konva layer
+        let width, height; // size of Konva canvas
+        let stage = null;   // Konva stage
+        let layer = null;   // Konva layer
+
+        // Variable para mantener una referencia al transformador actual
+        let currentTransformer = null;
 
 
         // ==============================================================
-        // FUNCIONES PRINCIPALES - Definidas en el ámbito del módulo
+        // MAIN FUNCTIONS - Defined within the module scope
         // ==============================================================
 
-        
         function renderPage(num) {
             pageRendering = true;
+
+            // Clear existing annotations and transformers when changing page
             if (layer) {
                 layer.destroyChildren();
-                layer.draw(); // upload konva layer if exists
+                layer.draw();
+                // Also destroy the transformer if it exists
+                if (currentTransformer) {
+                    currentTransformer.destroy();
+                    currentTransformer = null;
+                }
             }
 
-
-            pdfDoc.getPage(num).then(function(page) {
-                var viewport = page.getViewport({ scale: 1.5 });
+            pdfDoc.getPage(num).then((page) => {
+                const viewport = page.getViewport({ scale: 1.5 });
                 pdfCanvas.height = viewport.height;
                 pdfCanvas.width = viewport.width;
 
                 width = pdfCanvas.width;
                 height = pdfCanvas.height;
 
-                var konvaContainer = document.getElementById('konva-container');
+                const konvaContainer = document.getElementById('konva-container');
+                
                 if (!stage) {
                     stage = new Konva.Stage({
                         container: konvaContainer,
@@ -148,129 +156,202 @@
                     });
                     layer = new Konva.Layer();
                     stage.add(layer);
+
+                    // Add global click listener to remove transformers when clicking outside shapes
+                    stage.on('click tap', (e) => {
+                        // If click/tap wasn't on a Konva shape (it was on the stage itself),
+                        // or if it was on the transformer, do nothing
+                        const clickedOnTransformer = e.target.getParent().className === 'Transformer';
+                        if (e.target === stage || clickedOnTransformer) {
+                            return;
+                        }
+
+                        // clicked on an annotation shape (Konva.Text, Konva.Image, etc.)
+                        // first deselect all annotations by removing the old transformer
+                        stage.find('Transformer').destroy();
+                        currentTransformer = null; // Clear the reference
+
+                        // create new transformer
+                        const transformer = new Konva.Transformer({
+                            anchorSize: 8, // size of corner anchors
+                            borderEnabled: true,
+                            borderStroke: 'yellow', // color of the border
+                            keepRatio: true, // Maintain aspect ratio when scaling (important for images)
+                            enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], // only allow corner scaling
+
+                        });
+                         layer.add(transformer);
+                         currentTransformer = transformer; // Store reference to the current transformer
+
+                        // attach it to the node clicked
+                        transformer.attachTo(e.target);
+                        layer.draw();
+                    });
+
+
+                    // Add keydown listener for deletion
+                    document.addEventListener('keydown', (e) => {
+                        // Check if a shape is selected (i.e., a transformer exists and is attached)
+                        if (currentTransformer && (e.key === 'Delete' || e.key === 'Backspace')) {
+                            // Prevent default browser behavior (like navigating back)
+                            e.preventDefault();
+
+                            // Get the node the transformer is attached to
+                            const selectedNodes = currentTransformer.getNodes();
+
+                            if (selectedNodes.length > 0) {
+                                const nodeToRemove = selectedNodes[0]; // Assuming only one node selected at a time
+
+                                // Remove the transformer first
+                                currentTransformer.destroy();
+                                currentTransformer = null; // Clear reference
+
+                                // Remove the node (shape)
+                                nodeToRemove.destroy();
+
+                                // Redraw the layer
+                                layer.draw();
+                                console.log('Shape deleted.');
+                            }
+                        }
+                    });
+
+
                 } else {
                     stage.width(width);
                     stage.height(height);
-                    konvaContainer.style.width = width + 'px';
-                    konvaContainer.style.height = height + 'px';
                 }
-                 konvaContainer.style.width = width + 'px';
-                 konvaContainer.style.height = height + 'px';
+                konvaContainer.style.width = width + 'px';
+                konvaContainer.style.height = height + 'px';
 
 
-                var renderContext = {
+                const renderContext = {
                     canvasContext: pdfCtx,
-                    viewport: viewport
+                    viewport: viewport,
                 };
 
-                var renderTask = page.render(renderContext);
+                const renderTask = page.render(renderContext);
 
-                renderTask.promise.then(function() {
+                renderTask.promise.then(() => {
                     pageRendering = false;
+
                     if (pageNumPending !== null) {
                         renderPage(pageNumPending);
                         pageNumPending = null;
                     }
-                    layer.draw(); 
+
+                    layer.draw();
                 });
             });
         }
 
         function loadPdf(url) {
-            
-            getDocument(url).promise.then(function(pdf) {
+            getDocument(url).promise.then((pdf) => {
                 pdfDoc = pdf;
                 document.getElementById('pdf-canvas').style.display = 'block';
                 document.getElementById('annotation-section').style.display = 'block';
                 renderPage(pageNum);
-            }).catch(function(error) {
+            }).catch((error) => {
                 console.error('Error loading PDF:', error);
                 alert('Error loading PDF after upload. Check console for details.');
                 document.getElementById('annotation-section').style.display = 'none';
             });
         }
 
-        
         function addText() {
-            var textInput = document.getElementById('add-text-input');
-            var textValue = textInput.value;
+            const textInput = document.getElementById('add-text-input');
+            const textValue = textInput.value;
+
             if (textValue && stage && layer) {
-                var textNode = new Konva.Text({
+                const textNode = new Konva.Text({
                     x: 50,
                     y: 50,
                     text: textValue,
                     fontSize: 20,
-                    fill: '#000000', 
+                    fill: '#000000',
                     draggable: true,
                 });
+
                 layer.add(textNode);
                 layer.draw();
-                textInput.value = ''; // clean the input after adding
+                textInput.value = ''; // Clear the input after adding
+
+                 // Add click listener to the text node to attach a transformer
+                textNode.on('click tap', (e) => {
+                    // The global stage listener will handle attaching the transformer
+                    // Just make sure this click doesn't propagate to the stage if not needed
+                    // e.cancelBubble = true; // Uncomment if clicks on text shouldn't deselect others
+                });
             }
         }
 
-        /**
-        * Adds an Image to Konva from a file
-        * @param {File} file El archivo de imagen seleccionado.
+        /*
+        * Adds an Image to Konva from a file.
+        * Maintains aspect ratio of the image upon adding,
+        * scaling if necessary to fit within an initial maximum size.
+        * @param {File} file The selected image file.
         */
         function addImageFromFile(file) {
             if (file && stage && layer) {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var imageObj = new Image();
-                    imageObj.onload = function() {
-                        var originalWidth = imageObj.width;
-                        var originalHeight = imageObj.height;
-                        var maxInitialSize = 150;
-                        var newWidth = originalWidth;
-                        var newHeight = originalHeight;
-                        if (originalWidth > maxInitialSize || originalHeight > maxInitialSize){
-                            var aspectRatio = originalWidth / originalHeight;
+                const reader = new FileReader();
 
-                            if (originalWidth > originalHeight){
+                reader.onload = (e) => {
+                    const imageObj = new Image();
+
+                    imageObj.onload = () => {
+                        const originalWidth = imageObj.width;
+                        const originalHeight = imageObj.height;
+
+                        // Define a maximum size for the initial image in the canvas
+                        const maxInitialSize = 150; // Longest side won't exceed 150px
+
+                        let newWidth = originalWidth;
+                        let newHeight = originalHeight;
+
+                        // Calculate new dimensions preserving aspect ratio
+                        // if either side exceeds the maximum initial size
+                        if (originalWidth > maxInitialSize || originalHeight > maxInitialSize) {
+                            const aspectRatio = originalWidth / originalHeight;
+
+                            if (originalWidth > originalHeight) {
+                                // If width is greater, scale based on max width
                                 newWidth = maxInitialSize;
                                 newHeight = maxInitialSize / aspectRatio;
-                            }else{
+                            } else {
+                                // If height is greater or equal, scale based on max height
                                 newHeight = maxInitialSize;
                                 newWidth = maxInitialSize * aspectRatio;
                             }
                         }
-                        var imageNode = new Konva.Image({
+
+                        const imageNode = new Konva.Image({
                             x: 50,
                             y: 50,
                             image: imageObj,
                             width: newWidth,
                             height: newHeight,
                             draggable: true,
-                            
                         });
+
                         layer.add(imageNode);
                         layer.draw();
 
-                        imageNode.on('click tap', function () {
-                            layer.find('Transformer').destroy(); // destroy actual transformers
-                            var transformer = new Konva.Transformer({
-                                nodes: [imageNode],
-                            });
-                            layer.add(transformer);
-                            layer.draw();
-                        });
-                         
-                        stage.on('click tap', function (e) {
-                            // if click/tap wasnt in a konva shape remove transformers
-                            if (e.target === stage) {
-                                layer.find('Transformer').destroy();
-                                layer.draw();
-                            }
+                        // Add click listener to the image node to attach a transformer
+                        imageNode.on('click tap', (e) => {
+                            // The global stage listener will handle attaching the transformer
+                            // e.cancelBubble = true; // Uncomment if clicks on image shouldn't deselect others
                         });
                     };
-                    imageObj.onerror = function() {
+
+                    imageObj.onerror = () => {
                         console.error("Error loading image for Konva", file.name);
                         alert("Could not load image: " + file.name);
                     };
+
                     imageObj.src = e.target.result;
                 };
-                reader.readAsDataURL(file); 
+
+                reader.readAsDataURL(file);
             }
         }
 
@@ -284,15 +365,22 @@
                 return;
             }
 
-            layer.draw(); // Update konva
+            // Hide the transformer during export
+            if (currentTransformer) {
+                currentTransformer.hide();
+                layer.draw(); // Redraw the layer without the transformer
+            }
 
-            // 1. Obtain Data URL from konva layer
-            var konvaDataURL = layer.toDataURL();
 
-            // 2. obtain Data URL from PDF canvas
-            var pdfDataURL = pdfCanvas.toDataURL('image/png');
+            layer.draw(); // Ensure Konva is updated
 
-            // 3. new Promises for both images
+            // 1. Obtain Data URL from Konva layer
+            const konvaDataURL = layer.toDataURL();
+
+            // 2. Obtain Data URL from PDF canvas
+            const pdfDataURL = pdfCanvas.toDataURL('image/png');
+
+            // 3. Create Promises for both images
             const loadImage = (url) => {
                 return new Promise((resolve, reject) => {
                     const img = new Image();
@@ -304,33 +392,38 @@
 
             let pdfImage, konvaImage;
             try {
-                 // wait for both images to load 
-                 [pdfImage, konvaImage] = await Promise.all([
-                     loadImage(pdfDataURL),
-                     loadImage(konvaDataURL)
-                 ]);
+                // Wait for both images to load
+                [pdfImage, konvaImage] = await Promise.all([
+                    loadImage(pdfDataURL),
+                    loadImage(konvaDataURL),
+                ]);
             } catch (error) {
                 console.error('Error loading images for export:', error);
                 alert('Error preparing images for export.');
                 return;
             }
 
-
-            // 4. create a temp canvas to combine
-            var tempCanvas = document.createElement('canvas');
-            tempCanvas.width = stage.width(); 
+            // 4. Create a temp canvas to combine
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = stage.width();
             tempCanvas.height = stage.height();
-            var tempCtx = tempCanvas.getContext('2d');
+            const tempCtx = tempCanvas.getContext('2d');
 
-            // 5. draw PDF image and konva image in the temporary canvas
+            // 5. Draw PDF image and Konva image in the temporary canvas
             tempCtx.drawImage(pdfImage, 0, 0, tempCanvas.width, tempCanvas.height);
             tempCtx.drawImage(konvaImage, 0, 0, tempCanvas.width, tempCanvas.height);
 
+            // 6. Get combined image as Data URL
+            const combinedDataURL = tempCanvas.toDataURL('image/png');
 
-            // 6. find combine image as data URL
-            var combinedDataURL = tempCanvas.toDataURL('image/png');
+             // Show the transformer again after getting the Data URL
+            if (currentTransformer) {
+                currentTransformer.show();
+                layer.draw(); // Redraw the layer with the transformer shown
+            }
 
-            // 7. send combined image to server using fetch
+
+            // 7. Send combined image to server using fetch
             fetch('{{ route('export.image') }}', {
                 method: 'POST',
                 headers: {
@@ -344,11 +437,11 @@
             })
             .then(response => {
                 if (!response.ok) {
-                     return response.json().then(err => {
-                         throw new Error(err.error || `HTTP error! status: ${response.status}`);
-                     }).catch(() => {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                     });
+                    return response.json().then(err => {
+                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    });
                 }
                 return response.json(); // Process if ok
             })
@@ -367,40 +460,41 @@
         }
 
         // ==============================================================
-        // MANEJADORES DE EVENTOS - Adjuntados via JavaScript (dentro del módulo)
+        // EVENT HANDLERS - Attached via JavaScript (within the module)
         // ==============================================================
 
         // Handle form
         document.getElementById('upload-form').addEventListener('submit', function(event) {
             event.preventDefault(); // prevent default form upload
-            var formData = new FormData(this); // Obtain form data
+            const formData = new FormData(this); // Obtain form data
 
             // Use fetch to send data to server (AJAX)
             fetch(this.action, {
                 method: this.method,
                 body: formData,
                 headers: {
-                    // inlcude CSRF token for Laravel
+                    // include CSRF token for Laravel
                     'X-CSRF-TOKEN': '{{ csrf_token() }}'
                 }
             })
             .then(response => {
                 if (!response.ok) {
                     return response.json().then(err => {
-                         throw new Error(err.error || `HTTP error! status: ${response.status}`);
-                     }).catch(() => {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                     });
+                        throw new Error(err.error || `HTTP error! status: ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    });
                 }
                 return response.json(); // Parse JSON response
             })
             .then(data => {
-                // fi JSON response contains pdfUrl and filename
+                // if JSON response contains pdfUrl and filename
                 if (data.pdfUrl && data.filename) {
                     pdfUrl = data.pdfUrl; // save pdf url
                     filename = data.filename; // save filename
-                    loadPdf(pdfUrl); 
-                    
+                    pageNum = 1; // Reset to first page for new PDF
+                    loadPdf(pdfUrl);
+
                 } else {
                     // Alert if response is 200 OK but wrong properties
                     alert('Upload successful but server response is invalid.');
@@ -414,31 +508,29 @@
         });
 
         // add listener to add-text-button
-        var addTextButton = document.getElementById('add-text-button');
+        const addTextButton = document.getElementById('add-text-button');
         if (addTextButton) {
             addTextButton.addEventListener('click', addText);
         } else {
             console.error("Button with ID 'add-text-button' not found.");
         }
 
-
-        // add listener to add-image-input
-        var addImageInput = document.getElementById('add-image-input');
+        // add listener to add-image-input (the hidden file input)
+        const addImageInput = document.getElementById('add-image-input');
         if (addImageInput) {
             addImageInput.addEventListener('change', function(event) {
-                 if (event.target.files.length > 0) {
+                if (event.target.files.length > 0) {
                     addImageFromFile(event.target.files[0]);
-                    // Opcional: Limpiar el input file para permitir subir el mismo archivo de nuevo
+                    // Optional: Clear the file input to allow selecting the same file again
                     event.target.value = '';
-                 }
+                }
             });
         } else {
             console.error("Input with ID 'add-image-input' not found.");
         }
 
-
         // add listener to export-button
-        var exportButton = document.getElementById('export-button');
+        const exportButton = document.getElementById('export-button');
         if (exportButton) {
             exportButton.addEventListener('click', exportCanvas);
         } else {
@@ -447,16 +539,15 @@
 
 
         // ==============================================================
-        // Lógica inicial al cargar la página (Opcional)
+        // INITIAL PAGE LOAD LOGIC (Optional)
         // ==============================================================
-        // Esta parte solo se ejecuta si el controlador carga la vista pasando $pdfUrl y $filename
-        // Si solo usas la subida AJAX, esta parte no hará nada hasta que la subida ocurra.
+        // This part only runs if the controller loads the view passing $pdfUrl and $filename.
+        // If you only use AJAX upload, this part won't do anything until upload occurs.
         @if(isset($pdfUrl) && isset($filename))
             pdfUrl = "{{ $pdfUrl }}";
             filename = "{{ $filename }}";
             loadPdf(pdfUrl);
         @endif
-
 
     </script>
 
