@@ -13,8 +13,16 @@
 
     <style>
         body { 
-            margin: 0; padding: 0; background-color: #000000; 
-            color: #f0f0f0;
+            margin: 0; 
+            padding: 0; 
+            background-color: #f9f9e5; 
+            transition: background-color 0.3s ease, color 0.3s ease;
+            padding: 20px;
+            color: #000000;
+        }
+        body.dark-mode {
+            background-color: #0b0b0b; /* Fondo oscuro */
+            color: #ffffff; /* Texto claro */
         }
         #container {
             width: 100%;
@@ -47,27 +55,29 @@
             margin: 0 10px;
         }
         .btn {
-            background-color: #
+            background-color: #4f46c4;
         }
+        
     </style>
 </head>
 <body>
-    <div id="container">
-        <div id="top-section">
+    <div id="container" class="container d-flex flex-column align-items-center">
+        <div class="container">
             
-            <h1>PDF</h1>
-            <div class="d-flex flex-row-end justify-content-around mb-3">
-                
-                <div class="p-2">
-                    <button type="button" class="btn">
-                        <span class="material-symbols-outlined">contrast</span>
-                    </button>
+            <div id="top-section" class="d-flex justify-content-around border-bottom border-primary-subtle">
+                <div class="d-flex m-5 "></div>
+                <h2 class="p-2">PDF Annotator</h2>
+                <div class="d-flex m-3 ">
+                    <div>
+                        <button id="darkMode" type="button" class="btn">
+                            <span class="material-symbols-outlined">contrast</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div id="upload-section">
-            <h2>Upload PDF</h2>
+        <div id="upload-section" class="d-flex flex-column border-bottom border-primary-subtle m-3">
+            <h3>Upload PDF</h3>
 
             @if ($errors->any())
                 <div class="alert alert-danger">
@@ -80,27 +90,28 @@
             @endif
             
             
-
-            <form id="upload-form" action="{{ route('upload.pdf') }}" method="POST" enctype="multipart/form-data">
-                @csrf
-                <input type="file" name="pdf_file" id="pdf_file" class="button" required>
-                <button type="submit" class="btn">Upload</button>
-                
-            </form>
+            <div class="d-flex justify-content-center mt-3">
+                <form id="upload-form" action="{{ route('upload.pdf') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <input type="file" name="pdf_file" id="pdf_file" required>
+                    <button type="submit" class="btn my-3">Upload</button>
+                    
+                </form>
+            </div>
         </div>
 
-        <div id="annotation-section" class="container">
-            <h2>Annotate PDF</h2>
+        <div id="annotation-section" class="container d-flex flex-column align-items-center mt-5">
+            <h3>Annotate PDF</h3>
             <div id="pdf-container">
                 <canvas id="pdf-canvas"></canvas>
                 <div id="konva-container"></div>
             </div>
             
-            <div class="controls">
+            <div class="controls d-flex flex-column justify-content-evenly">
                 <div class="control-item">
                     <label for="add-text-input">Texto:</label>
                     <input type="text" id="add-text-input" style="color:#f0f0f0;">
-                    <button id="add-text-button" class="btn">Add Text</button>
+                    <button id="add-text-button" class="btn m-3">Add Text</button>
                 </div>
 
                 <div class="control-item">
@@ -108,7 +119,7 @@
                     <input type="file" id="add-image-input" accept="image/*">
                 </div>
                 <div class="control-item">
-                    <button id="export-button" class="btn">Export Image</button>
+                    <button id="export-button" class="btn mt-3">Export Image</button>
                 </div>
             </div>
         </div>
@@ -127,6 +138,9 @@
 
         GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.worker.min.mjs';
 
+        const toggleButton = document.getElementById('darkMode');
+        const body = document.body;
+        const darkModeStorageKey = 'darkModeEnabled';
         let pdfUrl = null; // URL from loaded pdf
         let pdfDoc = null; // PDFDocumentProxy object from PDF.js
         let pageNum = 1;     // current page (to change page to Annotate, change this var)
@@ -147,6 +161,28 @@
         // ==============================================================
         // MAIN FUNCTIONS - Defined within the module scope
         // ==============================================================
+
+        function applyMode(isDarkMode) {
+            if (isDarkMode) {
+                body.classList.add('dark-mode');
+            } else {
+                body.classList.remove('dark-mode');
+            }
+        }
+        const savedMode = localStorage.getItem(darkModeStorageKey);
+        if (savedMode === 'true') {
+            applyMode(true);
+        } else {
+            // if there's no preference clear mode prefered
+            applyMode(false);
+        }
+        toggleButton.addEventListener('click', () => {
+            const isDarkMode = body.classList.contains('dark-mode');
+            // Alternate mode
+            applyMode(!isDarkMode);
+            // store the preference in localStorage
+            localStorage.setItem(darkModeStorageKey, !isDarkMode);
+        });
 
         function renderPage(num) {
             pageRendering = true;
