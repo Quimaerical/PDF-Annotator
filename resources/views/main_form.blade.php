@@ -176,13 +176,13 @@
                     // =========================================================================
                     // MODIFIED STAGE CLICK LISTENER: Handles selection when Edit Mode is active
                     // =========================================================================
-                    stage.on('click tap', (e) => {
+                    stage.on('click tap', (e) => { // <--- Correcto, 'e' está definido aquí
                         // Check if the click was on the transformer itself
-                        const clickedOnTransformer = e.target.getParent().className === 'Transformer'; // <-- Added check
+                        const clickedOnTransformer = e.target.getParent().className === 'Transformer'; // <-- Esta línea SÍ está bien AQUÍ
 
-                        // Deselect if click is on stage background OR if in edit mode and clicking the transformer itself
+                        // Deselect if click is on stage background OR on the transformer itself
                         // Only deselect logic happens here now, AND it happens on stage OR transformer click
-                        if (e.target === stage || clickedOnTransformer) { // <-- MODIFIED CONDITION
+                        if (e.target === stage || clickedOnTransformer) {
                             // If a transformer is currently attached...
                             if (currentTransformer) {
                                 // ...destroy it and clear the reference (deselect)
@@ -194,10 +194,10 @@
                         }
 
                         // If the click target is a shape (not stage or transformer)
-                        // Only perform selection logic if Edit Mode is active <-- ADDED CONDITION
+                        // Only perform selection logic if Edit Mode is active
                         if (isEditModeActive) {
                             // Deselect any other selected nodes by removing the old transformer
-                            stage.find('Transformer').destroy();
+                            stage.find('Transformer').forEach(tr => tr.destroy()); // <--- Usar forEach
                             currentTransformer = null; // Clear the reference
 
                             // Create new transformer and attach it to the clicked shape
@@ -206,72 +206,72 @@
                                 anchorSize: 8, // size of corner anchors
                                 borderEnabled: true,
                                 borderStroke: 'yellow', // color of the border
-                                keepRatio: e.target instanceof Konva.Image, // Maintain aspect ratio only for images <-- MODIFIED
-                                enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], // only allow corner scaling
+                                keepRatio: e.target instanceof Konva.Image, // Maintain aspect ratio only for images
+                                enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'bottom', 'top', 'left', 'right'],
                             });
                             layer.add(transformer);
                             currentTransformer = transformer; // Store reference to the current transformer
 
                             layer.draw(); // Redraw the layer to show the transformer
 
-                        } 
-                        // If not in Edit Mode, clicking on a shape only performs dragging (handled by draggable: true)
-                    });
-                        // If click/tap wasn't on a Konva shape (it was on the stage itself),
-                        // or if it was on the transformer, do nothing
-                        const clickedOnTransformer = e.target.getParent().className === 'Transformer';
-                        if (e.target === stage || clickedOnTransformer) {
-                            return;
                         }
+                        // If not in Edit Mode, clicking on a shape only performs dragging (handled by draggable: true)
+                        // and clicking elsewhere does nothing.
+                    });
 
-                        // clicked on an annotation shape (Konva.Text, Konva.Image, etc.)
-                        // first deselect all annotations by removing the old transformer
-                        stage.find('Transformer').destroy();
-                        currentTransformer = null; // Clear the reference
-
-                        // create new transformer
-                        const transformer = new Konva.Transformer({
-                            anchorSize: 8, // size of corner anchors
-                            borderEnabled: true,
-                            borderStroke: 'yellow', // color of the border
-                            keepRatio: true, // Maintain aspect ratio when scaling (important for images)
-                            enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'], // only allow corner scaling
-
-                        });
-                        layer.add(transformer);
-                        currentTransformer = transformer; // Store reference to the current transformer
-
-                        // attach it to the node clicked
-                        transformer.attachTo(e.target);
-                        layer.draw();
                     
                     // Add keydown listener for deletion
+                    // document.addEventListener('keydown', (e) => {
+                    //     // Check if a shape is selected (i.e., a transformer exists and is attached)
+                    //     if (currentTransformer && (e.key === 'Delete' || e.key === 'Backspace')) {
+                    //         // Prevent default browser behavior (like navigating back)
+                    //         e.preventDefault();
+
+                    //         // Get the node the transformer is attached to
+                    //         const selectedNodes = currentTransformer.getNodes();
+
+                    //         if (selectedNodes.length > 0) {
+                    //             const nodeToRemove = selectedNodes[0]; // Assuming only one node selected at a time
+
+                    //             // Remove the transformer first
+                    //             currentTransformer.destroy();
+                    //             currentTransformer = null; // Clear reference
+
+                    //             // Remove the node (shape)
+                    //             nodeToRemove.destroy();
+
+                    //             // Redraw the layer
+                    //             layer.draw();
+                    //             console.log('Shape deleted.');
+                    //         }
+                    //     }
+                    // });
                     document.addEventListener('keydown', (e) => {
-                        // Check if a shape is selected (i.e., a transformer exists and is attached)
-                        if (currentTransformer && (e.key === 'Delete' || e.key === 'Backspace')) {
-                            // Prevent default browser behavior (like navigating back)
-                            e.preventDefault();
+                    // Check if Edit Mode is active AND a shape is selected (transformer exists)
+                    // AND the pressed key is Delete or Backspace
+                    if (isEditModeActive && currentTransformer && (e.key === 'Delete' || e.key === 'Backspace')) { // <--- MODIFIED CONDITION
+                        // Prevent default browser behavior (like navigating back)
+                        e.preventDefault();
 
-                            // Get the node the transformer is attached to
-                            const selectedNodes = currentTransformer.getNodes();
+                        // Get the node the transformer is attached to
+                        const selectedNodes = currentTransformer.getNodes();
 
-                            if (selectedNodes.length > 0) {
-                                const nodeToRemove = selectedNodes[0]; // Assuming only one node selected at a time
+                        if (selectedNodes.length > 0) {
+                            const nodeToRemove = selectedNodes[0]; // Assuming only one node selected at a time
 
-                                // Remove the transformer first
-                                currentTransformer.destroy();
-                                currentTransformer = null; // Clear reference
+                            // Remove the transformer first
+                            currentTransformer.destroy();
+                            currentTransformer = null; // Clear reference
 
-                                // Remove the node (shape)
-                                nodeToRemove.destroy();
+                            // Remove the node (shape)
+                            nodeToRemove.destroy();
 
-                                // Redraw the layer
-                                layer.draw();
-                                console.log('Shape deleted.');
-                            }
+                            // Redraw the layer
+                            layer.draw();
+                            console.log('Shape deleted.');
                         }
-                    });
-
+                    }
+                });
 
                 } else {
                     stage.width(width);
@@ -568,7 +568,7 @@
         if (editButton) {
             editButton.addEventListener('click', () => {
 
-                
+
 
                 // If stage is not initialized yet, do nothing
                 if (!stage || !layer) {
@@ -587,7 +587,9 @@
                     const allShapes = layer.find('Text, Image'); // Find all text and image nodes
 
                     // Destroy any existing transformers first
-                    stage.find('Transformer').destroy();
+                    stage.find('Transformer').forEach((transformer) => {
+                        tranformer.destroy();
+                    });
                     currentTransformer = null; // Clear reference
 
                     // If there are shapes, create ONE transformer and attach it to ALL of them
