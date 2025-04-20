@@ -1291,3 +1291,81 @@
   
   /* !SECTION Page Layout */
   /* !SECTION Layout */
+
+  /* USER */
+  body { 
+    margin: 0; 
+    padding: 0; 
+    background-color: #caca9c; 
+    padding: 20px;
+    color: #000000;
+  }
+  body.dark-mode {
+    background-color: #0b0b0b; /* Fondo oscuro */
+    color: #ffffff; /* Texto claro */
+  }
+  #container {
+    width: 100%;
+    text-align: center;
+    margin-top: 20px;
+  }
+  #upload-section {
+    margin-bottom: 20px;
+  }
+  #pdf-container {
+    position: relative;
+    display: inline-block;
+  }
+  #pdf-canvas {
+    display: block; 
+    border: 1px solid #aaa;
+  }
+  #konva-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    border: 1px solid #ccc;
+  }
+  .controls {
+    margin-top: 20px;
+    text-align: center;
+    background-color: #3a3491;
+    border-radius: 20px;
+    padding: 10px;
+  }
+  .control-item {
+    margin: 0 10px;
+  }
+  .btn {
+    background-color: #4f46c4;
+    color: #f0f0f0
+  }
+  .top-section {
+    background-color: #3a3491;
+    border-radius: 20px;
+  }
+  /* Style for hidden file input */
+  #add-image-input {
+    display: none; /* Hide the actual file input */
+  }
+
+  /* Style for the label that acts as a button */
+  label[for="add-image-input"] {
+    display: inline-block;
+    background-color: #4f46c4; /* Button background color */
+    color: white; /* Button text color */
+    padding: 8px 15px; /* Padding */
+    border-radius: 5px; /* Rounded corners */
+    cursor: pointer; /* Mouse cursor */
+    margin: 0 10px; /* Match control-item margin */
+    font-size: 1rem; /* Match button font size */
+    line-height: 1.5; /* Match button line height */
+    border: 1px solid transparent; /* Match button border */
+    vertical-align: middle; /* Align with buttons */
+  }
+
+  /* Style the label on hover/focus if needed */
+  label[for="add-image-input"]:hover {
+    background-color: #3a3491; /* Darker shade on hover */
+  }
