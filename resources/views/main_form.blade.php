@@ -40,8 +40,9 @@
             @endif
             
             <div class="d-flex justify-content-center mt-3">
-                <form id="upload-form" action="{{ route('upload.pdf') }}" method="POST" enctype="multipart/form-data">
+                <form id="upload-form" action="{{ route('upload.pdf') }}" method="POST" enctype="multipart/form-data" class="d-flex flex-column">
                     @csrf
+                    <label for="pdf_file" class="btn">Select PDF</label>
                     <input type="file" name="pdf_file" id="pdf_file" required>
                     <button type="submit" class="btn my-3">Upload</button>
                     
