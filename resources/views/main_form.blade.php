@@ -2,10 +2,15 @@
 <html>
 
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PDF Annotation</title>
     <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.5/dist/css/bootstrap.min.css" integrity="sha384-SgOJa3DmI69IUzQ2PVdRZhwQ+dy64/BUtbMJw1MZ8t5HZApcHrRKUc4W0kG879m7" crossorigin="anonymous">
     <link rel="stylesheet" href="{{ asset('css/main.css') }}">
     <link rel="stylesheet" href="{{ asset('css/normalize.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&icon_names=contrast" />
+
     <style>
         body { 
             margin: 0; padding: 0; background-color: #000000; 
@@ -41,12 +46,28 @@
         .control-item {
             margin: 0 10px;
         }
+        .btn {
+            background-color: #
+        }
     </style>
 </head>
 <body>
     <div id="container">
+        <div id="top-section">
+            
+            <h1>PDF</h1>
+            <div class="d-flex flex-row-end justify-content-around mb-3">
+                
+                <div class="p-2">
+                    <button type="button" class="btn">
+                        <span class="material-symbols-outlined">contrast</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div id="upload-section">
-            <h1>Upload PDF</h1>
+            <h2>Upload PDF</h2>
 
             @if ($errors->any())
                 <div class="alert alert-danger">
@@ -57,11 +78,14 @@
                     </ul>
                 </div>
             @endif
+            
+            
 
             <form id="upload-form" action="{{ route('upload.pdf') }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <input type="file" name="pdf_file" id="pdf_file" class="button" required>
-                <button type="submit" class="button">Upload</button>
+                <button type="submit" class="btn">Upload</button>
+                
             </form>
         </div>
 
@@ -71,12 +95,12 @@
                 <canvas id="pdf-canvas"></canvas>
                 <div id="konva-container"></div>
             </div>
-
+            
             <div class="controls">
                 <div class="control-item">
                     <label for="add-text-input">Texto:</label>
                     <input type="text" id="add-text-input" style="color:#f0f0f0;">
-                    <button id="add-text-button">Add Text</button>
+                    <button id="add-text-button" class="btn">Add Text</button>
                 </div>
 
                 <div class="control-item">
@@ -84,7 +108,7 @@
                     <input type="file" id="add-image-input" accept="image/*">
                 </div>
                 <div class="control-item">
-                    <button id="export-button">Export Image</button>
+                    <button id="export-button" class="btn">Export Image</button>
                 </div>
             </div>
         </div>
